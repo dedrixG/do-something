@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Do Something
+Comment=Look extremely busy on every screen
+Exec=@ROOT@/start.sh
+Icon=@ROOT@/share/icon.svg
+Terminal=false
+Categories=Utility;Amusement;
+Keywords=hacker;busy;matrix;terminal;something;
+StartupNotify=false

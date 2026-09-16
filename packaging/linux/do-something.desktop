@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Do Something
+Comment=Look extremely busy on every screen
+Keywords=screensaver;hacker;busy;matrix;terminal;
+Exec=do-something
+Icon=do-something
+Terminal=false
+Categories=Utility;Amusement;
+StartupNotify=false
