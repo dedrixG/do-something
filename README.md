@@ -8,6 +8,8 @@ Move the mouse or press a key to quit.
 
 ![Do Something icon](share/icon.svg)
 
+![Do Something — System Check seed](share/screenshot.png)
+
 ## Quick start
 
 ### Linux (AppImage)
