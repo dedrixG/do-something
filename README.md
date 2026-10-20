@@ -60,7 +60,7 @@ git clone https://github.com/dedrixG/do-something.git
 cd do-something
 ```
 
-### Fedora
+### Linux (dnf)
 
 ```bash
 sudo dnf install python3-pyside6
