@@ -6,7 +6,7 @@ from pathlib import Path
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from do_something import SeedWorld, peel_windows_scr  # noqa: E402
+from do_something import SeedWorld, parse_args, peel_windows_scr  # noqa: E402
 
 
 class SeedWorldTests(unittest.TestCase):
@@ -50,6 +50,21 @@ class WindowsScrArgsTests(unittest.TestCase):
         mode, rest = peel_windows_scr(["/p", "12345", "--seed", "x"])
         self.assertEqual(mode, "preview")
         self.assertEqual(rest, ["--seed", "x"])
+
+
+class ParseArgsTests(unittest.TestCase):
+    def test_defaults(self):
+        args = parse_args([])
+        self.assertFalse(args.windowed)
+        self.assertEqual(args.width, 1600)
+        self.assertEqual(args.height, 900)
+        self.assertIsNone(args.seed)
+
+    def test_flags_and_seed(self):
+        args = parse_args(["--seed", "Bed time", "--window", "--width", "800"])
+        self.assertTrue(args.windowed)
+        self.assertEqual(args.width, 800)
+        self.assertEqual(args.seed, "Bed time")
 
 
 if __name__ == "__main__":
