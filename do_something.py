@@ -1269,6 +1269,8 @@ def peel_windows_scr(argv: list[str]) -> tuple[str | None, list[str]]:
         elif al in ("/p", "-p"):
             mode = "preview"
             skip = True
+        elif al.startswith("/p:") or al.startswith("-p:"):
+            mode = "preview"
         elif al.startswith("/p") or al.startswith("-p"):
             mode = "preview"
         else:
