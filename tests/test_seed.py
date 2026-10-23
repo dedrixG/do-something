@@ -51,6 +51,30 @@ class WindowsScrArgsTests(unittest.TestCase):
         self.assertEqual(mode, "preview")
         self.assertEqual(rest, ["--seed", "x"])
 
+    def test_contact_format(self):
+        w = SeedWorld("System Check")
+        contact = w.contact(0)
+        # Must match ^[A-Z0-9]{1,8}-[0-9A-F]{4}$
+        self.assertRegex(contact, r"^[A-Z0-9]{1,8}-[0-9A-F]{4}$")
+
+    def test_contact_stable(self):
+        w = SeedWorld("System Check")
+        self.assertEqual(w.contact(0), w.contact(0))
+        self.assertEqual(w.contact(0), w.contact(0))
+
+    def test_ident_truncation(self):
+        # Short phrase
+        w1 = SeedWorld("abc")
+        self.assertLessEqual(len(w1.ident), 24)
+        # Long phrase
+        w2 = SeedWorld("this is a very long phrase that should be truncated")
+        self.assertLessEqual(len(w2.ident), 24)
+
+    def test_slug_keeps_words(self):
+        w = SeedWorld("System Check")
+        self.assertIn("system", w.slug)
+        self.assertIn("check", w.slug)
+
 
 if __name__ == "__main__":
     unittest.main()
