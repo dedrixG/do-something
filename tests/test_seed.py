@@ -51,6 +51,36 @@ class WindowsScrArgsTests(unittest.TestCase):
         self.assertEqual(mode, "preview")
         self.assertEqual(rest, ["--seed", "x"])
 
+    def test_uppercase_s(self):
+        mode, rest = peel_windows_scr(["/S"])
+        self.assertEqual(mode, "fullscreen")
+        self.assertEqual(rest, [])
+
+    def test_config_colon(self):
+        mode, rest = peel_windows_scr(["/c:1234"])
+        self.assertEqual(mode, "config")
+        self.assertEqual(rest, [])
+
+    def test_preview_colon(self):
+        mode, rest = peel_windows_scr(["/p:5678", "--seed", "x"])
+        self.assertEqual(mode, "preview")
+        self.assertEqual(rest, ["--seed", "x"])
+
+    def test_dash_s(self):
+        mode, rest = peel_windows_scr(["-s"])
+        self.assertEqual(mode, "fullscreen")
+        self.assertEqual(rest, [])
+
+    def test_dash_p_with_arg(self):
+        mode, rest = peel_windows_scr(["-p", "99", "--seed", "x"])
+        self.assertEqual(mode, "preview")
+        self.assertEqual(rest, ["--seed", "x"])
+
+    def test_passthrough_non_flags(self):
+        mode, rest = peel_windows_scr(["/s", "--seed", "abc", "--windowed"])
+        self.assertEqual(mode, "fullscreen")
+        self.assertEqual(rest, ["--seed", "abc", "--windowed"])
+
 
 if __name__ == "__main__":
     unittest.main()
