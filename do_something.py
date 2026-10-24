@@ -1230,27 +1230,38 @@ def iter_screens(app: QApplication):
     return out
 
 
-def config_dir() -> Path:
+def config_dir(create: bool = False) -> Path:
     if sys.platform == "win32":
         base = Path(os.environ.get("APPDATA", str(Path.home() / "AppData" / "Roaming")))
         d = base / "DoSomething"
     else:
         base = Path(os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config")))
         d = base / "do-something"
-    d.mkdir(parents=True, exist_ok=True)
+    if create:
+        d.mkdir(parents=True, exist_ok=True)
     return d
 
 
 def load_saved_seed() -> str | None:
-    path = config_dir() / "seed.txt"
-    if not path.is_file():
+    try:
+        path = config_dir() / "seed.txt"
+        if not path.is_file():
+            return None
+        text = path.read_text(encoding="utf-8").strip()
+    except (OSError, UnicodeDecodeError):
         return None
-    text = path.read_text(encoding="utf-8").strip()
     return text or None
 
 
-def save_seed(phrase: str) -> None:
-    (config_dir() / "seed.txt").write_text(phrase.strip() + "\n", encoding="utf-8")
+def save_seed(phrase: str) -> bool:
+    try:
+        (config_dir(create=True) / "seed.txt").write_text(
+            phrase.strip() + "\n", encoding="utf-8"
+        )
+    except OSError as exc:
+        print(f"do-something  could not save seed: {exc}", file=sys.stderr)
+        return False
+    return True
 
 
 def peel_windows_scr(argv: list[str]) -> tuple[str | None, list[str]]:
