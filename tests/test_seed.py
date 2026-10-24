@@ -129,6 +129,11 @@ class WindowsScrArgsTests(unittest.TestCase):
         self.assertEqual(mode, "fullscreen")
         self.assertEqual(rest, ["--seed", "abc", "--windowed"])
 
+    def test_no_flag_argv(self):
+        mode, rest = peel_windows_scr(["--seed", "abc"])
+        self.assertIsNone(mode)
+        self.assertEqual(rest, ["--seed", "abc"])
+
 
 if __name__ == "__main__":
     unittest.main()
