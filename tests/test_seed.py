@@ -1,12 +1,20 @@
+import io
 import os
 import sys
+import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from do_something import SeedWorld, peel_windows_scr  # noqa: E402
+from do_something import (  # noqa: E402
+    SeedWorld,
+    load_saved_seed,
+    peel_windows_scr,
+    save_seed,
+)
 
 
 class SeedWorldTests(unittest.TestCase):
@@ -133,6 +141,49 @@ class WindowsScrArgsTests(unittest.TestCase):
         mode, rest = peel_windows_scr(["--seed", "abc"])
         self.assertIsNone(mode)
         self.assertEqual(rest, ["--seed", "abc"])
+
+
+def _seed_env(root: str) -> dict[str, str]:
+    env = {"XDG_CONFIG_HOME": root}
+    if sys.platform == "win32":
+        env["APPDATA"] = root
+    return env
+
+
+class SavedSeedTests(unittest.TestCase):
+    def test_load_saved_seed_does_not_create_config_dir(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            missing = Path(tmp) / "missing-config"
+            with patch.dict(os.environ, _seed_env(str(missing))):
+                self.assertIsNone(load_saved_seed())
+            self.assertFalse(missing.exists())
+
+    def test_load_saved_seed_returns_none_on_oserror(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp) / (
+                "DoSomething" if sys.platform == "win32" else "do-something"
+            )
+            folder.mkdir()
+            (folder / "seed.txt").write_text("hello\n", encoding="utf-8")
+            with patch.dict(os.environ, _seed_env(tmp)):
+                with patch.object(Path, "read_text", side_effect=PermissionError("nope")):
+                    self.assertIsNone(load_saved_seed())
+
+    def test_save_seed_creates_dir_and_round_trips(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            fresh = Path(tmp) / "fresh"
+            with patch.dict(os.environ, _seed_env(str(fresh))):
+                self.assertIs(save_seed("x"), True)
+                self.assertEqual(load_saved_seed(), "x")
+
+    def test_save_seed_returns_false_when_unwritable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            err = io.StringIO()
+            with patch.dict(os.environ, _seed_env(tmp)):
+                with patch.object(Path, "write_text", side_effect=PermissionError("nope")):
+                    with patch("do_something.sys.stderr", err):
+                        self.assertIs(save_seed("x"), False)
+            self.assertIn("could not save seed", err.getvalue())
 
 
 if __name__ == "__main__":
