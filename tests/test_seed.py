@@ -44,6 +44,21 @@ class SeedWorldTests(unittest.TestCase):
         self.assertEqual(w.phrase, "do something")
         self.assertTrue(w.hex)
 
+    def test_contact_format_and_stable(self):
+        world = SeedWorld("System Check")
+        contact = world.contact(0)
+        self.assertRegex(contact, r"^[A-Z0-9]{1,8}-[0-9A-F]{4}$")
+        self.assertEqual(contact, world.contact(0))
+
+    def test_ident_truncates_and_slug_keeps_every_word(self):
+        short = SeedWorld("abc")
+        self.assertLessEqual(len(short.ident), 24)
+        phrase = "this is a very long phrase that should be truncated"
+        world = SeedWorld(phrase)
+        self.assertLessEqual(len(world.ident), 24)
+        for word in phrase.split():
+            self.assertIn(word, world.slug)
+
 
 class CoverWindowGracePeriodTests(unittest.TestCase):
     def test_non_esc_key_does_not_quit(self):
