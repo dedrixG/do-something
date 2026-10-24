@@ -1361,10 +1361,13 @@ def main(argv: list[str] | None = None) -> int:
         preset = "System Check"
     if preset is None and scr_mode == "fullscreen":
         preset = load_saved_seed()
+    # --seed and --smoke must not replace the saved phrase. /c saves on its own.
+    interactive = preset is None
     world = prompt_seed(preset)
     if world is None:
         return 0
-    save_seed(world.phrase)
+    if interactive:
+        save_seed(world.phrase)
 
     if args.smoke or args.windowed:
         win = Windowed(world, args.width, args.height)

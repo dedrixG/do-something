@@ -4,7 +4,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from do_something import (  # noqa: E402
     SeedWorld,
     load_saved_seed,
+    main,
     parse_args,
     peel_windows_scr,
     save_seed,
@@ -231,6 +232,54 @@ class SavedSeedTests(unittest.TestCase):
                     with patch("do_something.sys.stderr", err):
                         self.assertIs(save_seed("x"), False)
             self.assertIn("could not save seed", err.getvalue())
+
+
+class LaunchSeedTests(unittest.TestCase):
+    def _run(self, argv, prompt):
+        app = MagicMock()
+        app.exec.return_value = 0
+        app.primaryScreen.return_value = None
+        with patch("do_something.QApplication", return_value=app), \
+             patch("do_something.QGuiApplication.screens", return_value=[]), \
+             patch("do_something.Windowed"), \
+             patch("do_something.CoverWindow"), \
+             patch("do_something.QTimer.singleShot"), \
+             patch("do_something.prompt_seed", side_effect=prompt):
+            return main(argv)
+
+    def test_smoke_and_seed_flag_leave_the_saved_seed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp) / (
+                "DoSomething" if sys.platform == "win32" else "do-something"
+            )
+            folder.mkdir()
+            seed = folder / "seed.txt"
+            seed.write_text("Mine\n", encoding="utf-8")
+
+            def answer(preset):
+                return SeedWorld(preset or "Typed")
+
+            with patch.dict(os.environ, _seed_env(tmp)):
+                self._run(["--smoke", str(Path(tmp) / "shot.png")], answer)
+                self.assertEqual(seed.read_text(encoding="utf-8"), "Mine\n")
+                self._run(["--seed", "Other"], answer)
+                self.assertEqual(seed.read_text(encoding="utf-8"), "Mine\n")
+
+    def test_prompt_and_config_still_save(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            def typed(preset):
+                self.assertIsNone(preset)
+                return SeedWorld("Typed")
+
+            def from_settings(preset):
+                self.assertIsNone(preset)
+                return SeedWorld("From settings")
+
+            with patch.dict(os.environ, _seed_env(tmp)):
+                self._run([], typed)
+                self.assertEqual(load_saved_seed(), "Typed")
+                self._run(["/c"], from_settings)
+                self.assertEqual(load_saved_seed(), "From settings")
 
 
 if __name__ == "__main__":
