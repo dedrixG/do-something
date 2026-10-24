@@ -1126,7 +1126,8 @@ class CoverWindow(BusyView):
     def keyPressEvent(self, event):
         if event.isAutoRepeat():
             return
-        QApplication.quit()
+        if event.key() == Qt.Key.Key_Escape:
+            QApplication.quit()
 
     def place(self) -> None:
         screen = self.screen_ref

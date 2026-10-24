@@ -36,6 +36,54 @@ class SeedWorldTests(unittest.TestCase):
         self.assertTrue(w.hex)
 
 
+class CoverWindowGracePeriodTests(unittest.TestCase):
+    def test_non_esc_key_does_not_quit(self):
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from do_something import CoverWindow, SeedWorld  # noqa: E402
+        from PySide6.QtWidgets import QApplication  # noqa: E402
+        from PySide6.QtGui import QKeyEvent  # noqa: E402
+        from PySide6.QtCore import QEvent, Qt  # noqa: E402
+
+        app = QApplication.instance() or QApplication([])
+        world = SeedWorld("Test Phrase")
+        
+        # Mock quit to verify it's not called
+        original_quit = QApplication.quit
+        quit_called = False
+        
+        def mock_quit():
+            nonlocal quit_called
+            quit_called = True
+            # Don't actually quit in test
+            
+        QApplication.quit = mock_quit
+
+        try:
+            # Create a dummy screen object for CoverWindow initialization
+            class DummyScreen:
+                def geometry(self):
+                    from PySide6.QtCore import QRect
+                    return QRect(0, 0, 1920, 1080)
+                def name(self):
+                    return "test"
+            
+            cover = CoverWindow(DummyScreen(), world, salt=0)
+            
+            # Simulate a non-Escape key press (e.g., 'A')
+            event_a = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_A, Qt.KeyboardModifier.NoModifier)
+            cover.keyPressEvent(event_a)
+            
+            self.assertFalse(quit_called, "QApplication.quit should not be called for non-Escape keys")
+
+            # Simulate Escape key press
+            event_esc = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Escape, Qt.KeyboardModifier.NoModifier)
+            cover.keyPressEvent(event_esc)
+            
+            self.assertTrue(quit_called, "QApplication.quit should be called for Escape key")
+        finally:
+            QApplication.quit = original_quit
+
+
 class WindowsScrArgsTests(unittest.TestCase):
     def test_fullscreen(self):
         mode, rest = peel_windows_scr(["/s"])
