@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from do_something import (  # noqa: E402
     SeedWorld,
     load_saved_seed,
+    parse_args,
     peel_windows_scr,
     save_seed,
 )
@@ -141,6 +142,21 @@ class WindowsScrArgsTests(unittest.TestCase):
         mode, rest = peel_windows_scr(["--seed", "abc"])
         self.assertIsNone(mode)
         self.assertEqual(rest, ["--seed", "abc"])
+
+
+class ParseArgsTests(unittest.TestCase):
+    def test_defaults(self):
+        args = parse_args([])
+        self.assertEqual(args.width, 1600)
+        self.assertEqual(args.height, 900)
+        self.assertIsNone(args.seed)
+        self.assertFalse(args.windowed)
+
+    def test_seed_window_and_width(self):
+        args = parse_args(["--seed", "Bed time", "--window", "--width", "800"])
+        self.assertEqual(args.seed, "Bed time")
+        self.assertTrue(args.windowed)
+        self.assertEqual(args.width, 800)
 
 
 def _seed_env(root: str) -> dict[str, str]:
