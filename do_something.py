@@ -1360,7 +1360,7 @@ def main(argv: list[str] | None = None) -> int:
     if preset is None and args.smoke:
         preset = "System Check"
     if preset is None and scr_mode == "fullscreen":
-        preset = load_saved_seed()
+        preset = load_saved_seed() or "System Check"
     # --seed and --smoke must not replace the saved phrase. /c saves on its own.
     interactive = preset is None
     world = prompt_seed(preset)

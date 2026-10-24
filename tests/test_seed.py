@@ -281,6 +281,45 @@ class LaunchSeedTests(unittest.TestCase):
                 self._run(["/c"], from_settings)
                 self.assertEqual(load_saved_seed(), "From settings")
 
+    def test_fullscreen_without_saved_seed_uses_system_check(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            seen = []
+
+            def answer(preset):
+                seen.append(preset)
+                return SeedWorld(preset or "should-not-prompt")
+
+            with patch.dict(os.environ, _seed_env(tmp)), \
+                 patch("do_something.SeedDialog") as dialog:
+                self._run(["/s"], answer)
+            self.assertEqual(seen, ["System Check"])
+            dialog.assert_not_called()
+            folder = Path(tmp) / (
+                "DoSomething" if sys.platform == "win32" else "do-something"
+            )
+            self.assertFalse((folder / "seed.txt").exists())
+
+    def test_fullscreen_keeps_a_saved_seed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp) / (
+                "DoSomething" if sys.platform == "win32" else "do-something"
+            )
+            folder.mkdir()
+            seed = folder / "seed.txt"
+            seed.write_text("Mine\n", encoding="utf-8")
+            seen = []
+
+            def answer(preset):
+                seen.append(preset)
+                return SeedWorld(preset or "should-not-prompt")
+
+            with patch.dict(os.environ, _seed_env(tmp)), \
+                 patch("do_something.SeedDialog") as dialog:
+                self._run(["/s"], answer)
+            self.assertEqual(seen, ["Mine"])
+            dialog.assert_not_called()
+            self.assertEqual(seed.read_text(encoding="utf-8"), "Mine\n")
+
 
 if __name__ == "__main__":
     unittest.main()

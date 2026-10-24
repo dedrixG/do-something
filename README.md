@@ -34,16 +34,19 @@ right-click → **Install**. Windows then calls:
 
 | Flag | Meaning |
 | --- | --- |
-| `/s` (or no flag) | Fullscreen |
+| `/s` | Fullscreen. Uses the saved seed, or `System Check` when none is saved. Does not ask. |
+| no flag | Seed prompt, then fullscreen. The answer is saved. |
 | `/c` | Seed prompt (saved for next time) |
 | `/p <HWND>` | Preview (ignored; exits) |
+
+`--seed` and `--smoke` leave the saved seed alone.
 
 The build is unsigned. SmartScreen may show “Windows protected your PC” —
 **More info → Run anyway**. That is expected for a hobby release.
 
 ## Seeds
 
-At launch you get a **SEED** prompt. Examples:
+A normal launch opens a **SEED** prompt. `/s` does not: it uses the saved seed, or `System Check`. Examples:
 
 - `System Check` — teal/gold, pyramids, `25.11.*`, `system-check.local`
 - `Bed time` — purple/green, needles, `51.193.*`, radar `BED-…`
