@@ -207,6 +207,22 @@ class SavedSeedTests(unittest.TestCase):
                 self.assertIs(save_seed("x"), True)
                 self.assertEqual(load_saved_seed(), "x")
 
+    def test_save_then_load_returns_the_stripped_phrase(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.dict(os.environ, _seed_env(tmp)):
+                self.assertIs(save_seed("  Hello World  "), True)
+                self.assertEqual(load_saved_seed(), "Hello World")
+
+    def test_whitespace_only_file_returns_none(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp) / (
+                "DoSomething" if sys.platform == "win32" else "do-something"
+            )
+            folder.mkdir()
+            (folder / "seed.txt").write_text("   \n\t\n", encoding="utf-8")
+            with patch.dict(os.environ, _seed_env(tmp)):
+                self.assertIsNone(load_saved_seed())
+
     def test_save_seed_returns_false_when_unwritable(self):
         with tempfile.TemporaryDirectory() as tmp:
             err = io.StringIO()
