@@ -39,7 +39,7 @@ from PySide6.QtWidgets import (
 
 APP_NAME = "do-something"
 APP_DISPLAY_NAME = "Do Something"
-APP_VERSION = "0.1.0"
+APP_VERSION = "0.2.0"
 
 
 def app_root() -> Path:
