@@ -90,6 +90,19 @@ Useful flags:
 
 Quit: move the mouse, click, or press a key (Esc always works).
 
+## Remote sessions
+
+When the machine is used remotely, the local screens can keep showing Do Something
+while you work on a separate (for example virtual) output:
+
+- `--skip-screens PATTERNS` leaves matching screens uncovered. Default `Virtual-*`
+  (KDE virtual outputs). Also `$DO_SOMETHING_SKIP_SCREENS`; pass `''` to cover all.
+- `--stream-lock` starts locked: no input quits it, not even Esc.
+- On Linux/macOS, `SIGUSR1` locks and `SIGUSR2` unlocks a running instance. A
+  process that supports this writes `$XDG_RUNTIME_DIR/do-something/<pid>.lockable`;
+  older builds have no handler and SIGUSR1 would end them, so check for the marker
+  before signalling.
+
 ## Packaging
 
 ```bash
