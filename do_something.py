@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import argparse
 import colorsys
+import fnmatch
 import hashlib
 import math
 import os
 import re
+import signal
 import sys
 import time
 from dataclasses import dataclass, field
@@ -311,12 +313,24 @@ class ScreensaverGuard(QObject):
         Qt.Key.Key_CapsLock, Qt.Key.Key_NumLock, Qt.Key.Key_ScrollLock,
     }
 
-    def __init__(self, grace_s: float = 0.9, parent=None):
+    def __init__(self, grace_s: float = 0.9, parent=None, locked: bool = False):
         super().__init__(parent)
         self.armed = False
         self.origin = None
         self._done = False
+        # Stream lock: while locked, no input quits (not even Esc). Used when
+        # the machine is driven remotely and the covers must stay up locally.
+        self.locked = bool(locked)
         QTimer.singleShot(int(grace_s * 1000), self._arm)
+
+    def set_locked(self, locked: bool) -> None:
+        self.locked = bool(locked)
+        self.origin = None  # re-baseline the mouse so unlocking never quits at once
+        if self.locked:
+            grabber = QWidget.keyboardGrabber()
+            if grabber is not None:
+                grabber.releaseKeyboard()  # let the remote session's windows take keys
+        print(f"do-something  stream lock {'on' if self.locked else 'off'}", flush=True)
 
     def _arm(self) -> None:
         self.armed = True
@@ -334,6 +348,13 @@ class ScreensaverGuard(QObject):
         if self._done:
             return False
         et = event.type()
+        if self.locked:
+            if et in (
+                QEvent.Type.KeyPress, QEvent.Type.ShortcutOverride, QEvent.Type.MouseMove,
+                QEvent.Type.HoverMove, QEvent.Type.MouseButtonPress, QEvent.Type.Wheel,
+            ):
+                return True  # swallow input; stay up
+            return False
         if et in (QEvent.Type.KeyPress, QEvent.Type.ShortcutOverride):
             key = event.key()
             auto = bool(event.isAutoRepeat()) if hasattr(event, "isAutoRepeat") else False
@@ -1212,7 +1233,21 @@ class Windowed(QMainWindow):
         super().keyPressEvent(event)
 
 
-def iter_screens(app: QApplication):
+DEFAULT_SKIP_SCREENS = "Virtual-*"
+
+
+def skip_patterns(value: str | None) -> list[str]:
+    """Comma-separated fnmatch patterns of screen names to leave uncovered."""
+    if value is None:
+        value = os.environ.get("DO_SOMETHING_SKIP_SCREENS", DEFAULT_SKIP_SCREENS)
+    return [p.strip() for p in value.split(",") if p.strip()]
+
+
+def screen_skipped(name: str, patterns: list[str]) -> bool:
+    return any(fnmatch.fnmatchcase(name or "", p) for p in patterns)
+
+
+def iter_screens(app: QApplication, skip: list[str] | None = None):
     seen: set[tuple[int, int, int, int]] = set()
     screens = list(QGuiApplication.screens())
     if not screens and app.primaryScreen() is not None:
@@ -1220,6 +1255,8 @@ def iter_screens(app: QApplication):
     out = []
     for screen in screens:
         if screen is None:
+            continue
+        if skip and screen_skipped(screen.name(), skip):
             continue
         geo = screen.geometry()
         key = (int(geo.x()), int(geo.y()), int(geo.width()), int(geo.height()))
@@ -1299,7 +1336,57 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--height", type=int, default=900)
     p.add_argument("--seed", default=None, help="Seed phrase (skips the prompt)")
     p.add_argument("--version", action="store_true", help="Print version and exit")
+    p.add_argument(
+        "--skip-screens",
+        default=None,
+        metavar="PATTERNS",
+        help="Comma-separated screen-name patterns to leave uncovered "
+        f"(default {DEFAULT_SKIP_SCREENS!r}, or $DO_SOMETHING_SKIP_SCREENS; '' covers all)",
+    )
+    p.add_argument(
+        "--stream-lock",
+        action="store_true",
+        help="Start locked: input does not quit. SIGUSR1 locks, SIGUSR2 unlocks (Linux/macOS)",
+    )
     return p.parse_args(argv)
+
+
+def install_lock_signals(app, guard) -> None:
+    """SIGUSR1 = lock, SIGUSR2 = unlock. No-op where those signals do not exist."""
+    if not hasattr(signal, "SIGUSR1"):
+        return
+    signal.signal(signal.SIGUSR1, lambda *_: guard.set_locked(True))
+    signal.signal(signal.SIGUSR2, lambda *_: guard.set_locked(False))
+    # Let the Python interpreter run signal handlers while Qt's loop is idle.
+    tick = QTimer(app)
+    tick.timeout.connect(lambda: None)
+    tick.start(250)
+    app._lock_tick = tick
+    advertise_lockable()
+
+
+def lockable_marker() -> Path | None:
+    run = os.environ.get("XDG_RUNTIME_DIR")
+    if not run:
+        return None
+    return Path(run) / "do-something" / f"{os.getpid()}.lockable"
+
+
+def advertise_lockable() -> None:
+    """Tell controllers this process handles SIGUSR1/SIGUSR2. Older builds
+    have no handler, and SIGUSR1 would terminate them, so callers should only
+    signal a PID that has this marker."""
+    marker = lockable_marker()
+    if marker is None:
+        return
+    try:
+        marker.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        marker.write_text(APP_VERSION + "\n", encoding="utf-8")
+    except OSError:
+        return
+    import atexit
+
+    atexit.register(lambda: marker.unlink(missing_ok=True))
 
 
 def prompt_seed(preset: str | None) -> SeedWorld | None:
@@ -1335,7 +1422,8 @@ def main(argv: list[str] | None = None) -> int:
     if icon.exists():
         app.setWindowIcon(QIcon(str(icon)))
 
-    screens = iter_screens(app)
+    skip = skip_patterns(args.skip_screens)
+    screens = iter_screens(app, skip)
     if args.dump_screens:
         if not screens:
             print("do-something  no screens")
@@ -1389,12 +1477,16 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     app.setOverrideCursor(QCursor(Qt.CursorShape.BlankCursor))
-    guard = ScreensaverGuard(grace_s=0.9, parent=app)
+    guard = ScreensaverGuard(grace_s=0.9, parent=app, locked=args.stream_lock)
     app.installEventFilter(guard)
+    install_lock_signals(app, guard)
     covers: list[CoverWindow] = []
 
     def add_screen(screen) -> None:
         if any(c.screen_ref is screen for c in covers):
+            return
+        if screen_skipped(screen.name(), skip):
+            print(f"do-something  leaving screen {screen.name()} uncovered", flush=True)
             return
         cover = CoverWindow(screen, world, salt=len(covers))
         cover.installEventFilter(guard)
@@ -1413,7 +1505,7 @@ def main(argv: list[str] | None = None) -> int:
 
     for screen in screens:
         add_screen(screen)
-    if covers:
+    if covers and not guard.locked:
         QTimer.singleShot(100, lambda: covers[0].grabKeyboard())
     app.screenAdded.connect(add_screen)
     app.screenRemoved.connect(remove_screen)
